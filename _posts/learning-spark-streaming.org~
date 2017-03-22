@@ -1,0 +1,50 @@
+#+TITLE: Spark Streaming 入门
+#+DATE: <2016-09-09 14:51>
+#+TAGS: spark, streaming
+#+COMMENTS: no
+
+** 引言
+** Spark Streaming 架构
+** Spark 概念
+*** RDD
+RDD (Resilient Distributed Datasets, 弹性分布式数据集) 是 Spark 最核心的一个抽象, 具有以下特点:
++ 分布在集群中的只读对象集合(由多个 Partition 构成, 默认 1 副本)
++ 可以存储在内存或磁盘中(多种存储级别)
++ 并行转换 (transaction) 操作构造
++ 失效后自动重构
+RDD 基本操作:
++ Transformation
+Transformation 操作并不是立即执行, 而是在条用 Action 操作后才会实际执行
+++ 可通过 Scala 集合或者 Hadoop 数据构造新的 RDD
+++ 通过已有 RDD 产出新的 RDD (产生 1 个或者多个)
+++ 常见的有: map, filter, join, groupby
++ Action
+++ Action 操作的结果不再是一个 RDD, 可能是一个数或者一个数组
+++ 常见的有: count, collect, saveAsTextFile
+*** DataFrame
+*** DataSets
+*** 
+** Spark 执行时的数据结构 & 依赖关系
+** Spark Streaming 使用场景
+** Spark Streaming 交互详解
+** Spark Streaming 与 Storm 异同点
+** 为何选用 Spark Streaming
+** Spark Streaming 案例
+** 问题
+*** RDD 下不同的 Partition 存储在不同的节点(Node), Node 的概念是基于什么而言？RDD 是否有副本的概念?
++ Partition 分布在运行本应用的 Executor 的各个节点上, 每个 JVM (Executor) 至少对应一个 Partition
++ RDD 的容错是通过记录数据推到过程(创建 RDD 的一系列操作), 当节点故障时只需恢复节点上的 Partition 即可, 无需像 HDFS 一样保存多个副本
+*** AppMaster 负责给不同的 Executor 申请资源，如果是 yarn-cluster 模式，Driver 跟 AppMaster 是共享资源的？
+yarn-cluster 模式下, Driver 部署在 AppMaster 中, 与 AppMaster 共享资源
+*** Executor 中可以运行 1 个 task 或者多个 task. 如果 12 个 task 分布在 12 个 Executor 上(单 Executor 只执行单个 task) 或者 12 个 task 运行在 6 个 Executor 上(单 Executor 运行 2 个或者多个 task), 那种执行效率更高?
+一个 Executor 就代表一个 JVM, JVM 本身初始化会对资源有一定的消耗
+*** Spark 在申请资源时，是同时将所需资源全部申请完成后才会运行，还是不同的 Executor 只要申请到资源就可以先运行起来，不同等其他 Executor 是否申请到资源与否
+Spark 申请资源时是按照 Executor 粒度来申请资源
+*** Spark 3 中不同的运行模式, 如 standalone, mesos, yarn 都有什么区别？尤其 standalone 模式是如何运行和解决资源分配问题的?
++ standalone 模式即不依赖第三方资源调度系统, 自行在多台或者单台机器(伪分布式)上部署 Master/Slave, standalone 模式通过 Zookeeper 来实现 Master 的 HA
++ mesos 和 yarn 均为资源调度系统, mesos 和 yarn 都支持粗粒度调度, 即按照提交参数申请完运行时所需的全部资源再开始运行 APP. 而 mesos 支持细粒度的调度, 即 container 的资源可以按需分配, 申请完目前所需资源即可启动 APP, 因 yarn 的 container (Hadoop 2.7.1)不支持动态调整资源分配, 无法支持细粒度调度,对应 Hadoop issue:  [[https://issues.apache.org/jira/browse/YARN-1197][Support changing resources of an allocated container]]
+*** 如何根据数据量和计算复杂度设置资源申请参数?
+*** Spark 为何比 Mapreduce 更快? 具有哪些优势 & 劣势?
+*** 如何调整 Spark 任务的 task 数目
+*** Narror Dependency & Wide Dependency & Full Dependency & Shuffle Dependency 有什么区别
+*** Executor 运行在哪一台节点上是如何决定的？

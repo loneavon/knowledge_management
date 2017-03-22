@@ -1,0 +1,11 @@
+#+SETUPFILE: ~/.emacs.d/org-templates/level-0.org
+#+TITLE: 工具栈整理
+#+DATE: <2016-09-08 20:17>
+#+KEYWORDS: tool stack, 工具栈
+#+AUTHOR: levin
+#+EMAIL: loneavon1@gmail.com
+
+* 工具栈整理
+** base tool
+*** vim
+vim 目前配置使用 spf13-vim, github 地址: https://github.com/spf13/spf13-vim

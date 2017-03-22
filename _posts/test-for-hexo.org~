@@ -1,0 +1,9 @@
+#+TITLE: test-for-hexo
+#+DATE: 2017-01-01
+#+LAYOUT: post
+#+TAGS: hexo, blog-admin
+#+CATEGORIES: test
+
+* Hexo 和 Blog-admin 初体验
+** 引言
+断断续续终于将博客搭建起来，基于之前的摸索现有的博客系统使用 org-mode、blog-admin、hexo 工具链完成，托管平台使用 Github Pages

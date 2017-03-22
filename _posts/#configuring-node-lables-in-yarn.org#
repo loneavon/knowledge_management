@@ -1,0 +1,65 @@
+#+TITLE: Yarn 配置 Node Labels
+#+DATE: 2017-03-09
+#+LAYOUT: post
+#+TAGS:YARN, node labels
+#+CATEGORIES: 资源调度
+
+* 概述
+
+YARN 作为 Hadoop 中的资源调度器，针对离线场景提供丰富的功能支持。本文主要讨论 Node Label 的实用以及相关的概念
+
+作为资源调度器，YARN 提供了两个重要的概念 Queue（队列）和 Partition（分区），两者是同级的概念。底层节点资源挂载在 Partition 下，Queue 可根据需求设置可以访问哪个 Partition 的资源以及可使用的比例。YARN 含有一个默认 Partition，名为 DEFAULT PARTITION，默认所在的节点均挂载在此 Partition 下。Queue 的话，有一个根队列叫 root，所有新建的队列均为 root 的子队列，默认的子队列名为 default。当提交任务不指定队列以及分区时，默认此任务运行在 DEFAULT PARTITION 的 root 的子队列 default 下。
+#+BEGIN_HTML
+<!-- more -->
+#+END_HTML
+
+根据前面的了解，现有 3 个节点 (NodeManager)，假设为 host1、host2、host3，需要保证提供 3 个队列，且每个队列的任务只能运行在其中的 1 个节点上。下面我们来看一下具体的操作步骤
+
+队列 root 子队列的资源划分均使用百分比，且所有子队列的百分比之和必须等于 100%，假如 root 有 3 个子队列分别为 default、a、b, 则所占资源百分比可划分为 default（20%）、a（30%）、b（50%）。
+
+* 前置准备
++ 使用 capacity scheduler 调度策略
+在 yarn-site.xml 中添加
+#+BEGIN_SRC xml
+<property>
+  <name>yarn.resourcemanager.scheduler.class</name>
+  <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler</value>
+</property>
+#+END_SRC
+注: 目前可用的调度策略有 [[https://hadoop.apache.org/docs/r2.7.2/hadoop-yarn/hadoop-yarn-site/FairScheduler.html][FairScheduler]]、[[https://hadoop.apache.org/docs/r2.7.2/hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html][CapacityScheduler]] 和 FIFOScheduler
++ 开启 Node Labels
+在 yarn-site.xml 中添加
+#+BEGIN_SRC xml
+<property>
+  <name>yarn.node-labels.enabled</name>
+  <value>true</value>
+</property>
+#+END_SRC
++ 设置 Node Label 信息存储 HDFS 路径
+创建 HDFS 路径
+#+BEGIN_SRC zsh
+sudo su hdfs
+hadoop fs -mkdir -p /yarn/node-labels
+hadoop fs -chown -R yarn:yarn /yarn
+hadoop fs -chmod -R 700 /yarn
+#+END_SRC
+在 yarn-site.xml 中添加
+#+BEGIN_SRC xml
+<property>
+  <name>yarn.node-labels.fs-store.root-dir</name>
+  <value>/system/yarn/node-labels</value>
+</property>
+#+END_SRC
+
+* 创建 Node Labels
+创建 3 个名为 label_a, label_b, label_c 的 Node Labels
+#+BEGIN_SRC zsh
+sudo su yarn
+yarn rmadmin -addToClusterNodeLabels "label_a(exclusive=true),label_b(exclusive=true),label_c(exclusive=true)"
+#+END_SRC
+注: exclusive 默认为 true, true 表示当前 partition 空闲的资源不可被 default partition 的任务使用, false 则反之
+* 将节点 (NodeManager) 与 Node Labels 绑定
+#+BEGIN_SRC zsh
+yarn rmadmin -replaceLabelsOnNode "host1=label_a host2=label_b host3=label_c"
+#+END_SRC
+此处只将节点与 label 绑定(未指定 NodeManager 的端口), 若 host 上存在多个 NodeManager 进程则均绑定同一个 label. 另外, 单个 Node 只能绑定一个 label, 如果指定了端口, 则这个节点只能绑定这一个 label.

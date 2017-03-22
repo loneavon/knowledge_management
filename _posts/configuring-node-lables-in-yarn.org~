@@ -1,0 +1,57 @@
+#+TITLE: Yarn 配置 Node Labels
+#+DATE: 2017-03-09
+#+LAYOUT: post
+#+TAGS:YARN, node labels
+#+CATEGORIES: 资源调度
+
+* 概述
+
+现有 3 个节点 (NodeManager), 假设为 host1, host2, host3. 需要将 3 个节点划分独立的队列
+
+
+* 前置准备
++ 使用 capacity scheduler 调度策略
+在 yarn-site.xml 中添加
+#+BEGIN_SRC xml
+<property>
+  <name>yarn.resourcemanager.scheduler.class</name>
+  <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler</value>
+</property>
+#+END_SRC
+注: 目前可用的调度策略有 [[https://hadoop.apache.org/docs/r2.7.2/hadoop-yarn/hadoop-yarn-site/FairScheduler.html][FairScheduler]]、[[https://hadoop.apache.org/docs/r2.7.2/hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html][CapacityScheduler]] 和 FIFOScheduler
++ 开启 Node Labels
+在 yarn-site.xml 中添加
+#+BEGIN_SRC xml
+<property>
+  <name>yarn.node-labels.enabled</name>
+  <value>true</value>
+</property>
+#+END_SRC
++ 设置 Node Label 信息存储 HDFS 路径
+++ 创建 HDFS 路径
+#+BEGIN_SRC zsh
+sudo su hdfs
+hadoop fs -mkdir -p /yarn/node-labels
+hadoop fs -chown -R yarn:yarn /yarn
+hadoop fs -chmod -R 700 /yarn
+#+END_SRC
+++ 在 yarn-site.xml 中添加
+#+BEGIN_SRC xml
+<property>
+  <name>yarn.node-labels.fs-store.root-dir</name>
+  <value>/system/yarn/node-labels</value>
+</property>
+#+END_SRC
+
+* 创建 Node Labels
+创建 3 个名为 label_a, label_b, label_c 的 Node Labels
+#+BEGIN_SRC zsh
+sudo su yarn
+yarn rmadmin -addToClusterNodeLabels "label_a(exclusive=true),label_b(exclusive=true),label_c(exclusive=true)"
+#+END_SRC
+注: exclusive 默认为 true, true 表示当前 partition 空闲的资源不可被 default partition 的任务使用, false 则反之
+* 将节点 (NodeManager) 与 Node Labels 绑定
+#+BEGIN_SRC zsh
+yarn rmadmin -replaceLabelsOnNode "host1=label_a host2=label_b host3=label_c"
+#+END_SRC
+此处只将节点与 label 绑定(未指定 NodeManager 的端口), 若 host 上存在多个 NodeManager 进程则均绑定同一个 label. 另外, 单个 Node 只能绑定一个 label, 如果指定了端口, 则这个节点只能绑定这一个 label.

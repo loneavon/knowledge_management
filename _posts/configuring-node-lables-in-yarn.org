@@ -4,8 +4,6 @@
 #+TAGS:YARN, node labels
 #+CATEGORIES: 资源调度
 
-* 概述
-
 YARN 作为 Hadoop 中的资源调度器，针对离线场景提供丰富的功能支持。本文主要讨论 Node Label 的实用以及相关的概念
 
 作为资源调度器，YARN 提供了两个重要的概念 Queue（队列）和 Partition（分区），两者是同级的概念。底层节点资源挂载在 Partition 下，Queue 可根据需求设置可以访问哪个 Partition 的资源以及可使用的比例。YARN 含有一个默认 Partition，名为 DEFAULT PARTITION，默认所在的节点均挂载在此 Partition 下。Queue 的话，有一个根队列叫 root，所有新建的队列均为 root 的子队列，默认的子队列名为 default。当提交任务不指定队列以及分区时，默认此任务运行在 DEFAULT PARTITION 的 root 的子队列 default 下。

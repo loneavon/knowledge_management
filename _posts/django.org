@@ -1,11 +1,14 @@
 #+TITLE: Django 实用操作
 #+DATE: <2016-09-08 20:07>
 #+TAGS: django
-#+COMMENTS: no
+#+COMMENTS: yes
 
 
 *** 同步已有数据库生成 models
 python manage.py inspectdb --database '{db_name}'
+#+BEGIN_HTML
+<!-- more -->
+#+END_HTML
 *** 多数据库访问利器 db router
 Django 在多数据库下提供了 db router 来控制请求的读、写、relation、migrate
 For example:(各个方法策略均可以自己实现，具体请参考：https://docs.djangoproject.com/es/1.9/topics/db/multi-db/#using-routers )
@@ -44,9 +47,6 @@ Django 提供自定义 template 标签 & 过滤器的功能, 用来丰富自带�
 + 在 template 同级目录下创建 templatetags 目录（在此目录下记得创建 __init__.py, 标示此目录下 py 文件为可引用模块)
 + 在 templatetags 目录下创建自定义标签 or 过滤器模块文件
 For example:（具体请参见: https://docs.djangoproject.com/en/1.9/howto/custom-template-tags/ ）
-#+BEGIN_HTML
-<!-- more -->
-#+END_HTML
 #+BEGIN_SRC python
 import datetime
 from django import template

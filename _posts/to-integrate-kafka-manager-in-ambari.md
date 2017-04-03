@@ -1,0 +1,44 @@
+title: Ambari 集成 Kafka Manager
+date: 2016-11-21
+tags:
+- Kafka
+- Ambari
+categories: Bigdata
+---
+## Ambari 集成 Kafka-manager
+
+#### Kafka-manager RPM 包
+
+1. 下载 kafka-manager 源码包，通过 sbt rpm:packageBIN 生成 RPM 包
+
+2. 将 RPM 包加压
+
+   ```sh
+   rpm2cpio kafka-manager-1.3.1.8-1.noarch.rpm | cpio -div
+   ```
+
+   ​
+
+   将生成的 RPM 包加压，修改 SPECS 文件，避免 kafka-manager 安装后自动启动
+
+   将解压后的文件 cp 到 tmp-buildroot
+
+   ```sh
+   cd /mnt/kafka-manager/kafka-manager/target/rpm && cp -r RPMS/noarch/usr/ tmp-buildroot/ && cp -r RPMS/noarch/etc/ tmp-buildroot/ && cp -r RPMS/noarch/var/ tmp-buildroot/
+   ```
+   <!-- more -->
+   执行 rpmbuild 生成 RPM 包
+
+   ```sh
+   cd /mnt/kafka-manager/kafka-manager/target/rpm && rpmbuild -bb -v --buildroot /mnt/kafka-manager/kafka-manager/target/rpm/BUILDROOT/ --define '_topdir /mnt/kafka-manager/kafka-manager/target/rpm' --target noarch SPECS/kafka-manager.spec
+   ```
+
+#### Kafka-manager 在 Ambari 页面增加自定义配置
+
+
+
+### 问题
+
+1. ```
+   resource_management.core.exceptions.Fail: Execution of '/usr/bin/yum -d 0 -e 0 -y install 'kafka-manager-*'' returned 1. Error: database disk image is malformed
+   ```

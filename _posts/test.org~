@@ -1,0 +1,14 @@
+#+TITLE: test
+#+DATE: 2017-03-26
+#+LAYOUT: post
+#+TAGS:
+#+CATEGORIES:
+#+STARTUP: latexpreview
+
+这是在 org-mode 中插入公式的测试：\(a^{2} + b^{2} = c^{2}\)，效果如上
+\begin{equation}
+x=\sqrt{b}
+\end{equation}
+
+   If $a^2=b$ and \( b=2 \), then the solution must be
+     either $$ a=+\sqrt{2} $$ or \[ a=-\sqrt{2} \].

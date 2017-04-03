@@ -1,0 +1,18 @@
+#+TITLE: 机器学习入门
+#+DATE: 2017-01-03
+#+LAYOUT: post
+#+TAGS: machine-learning
+#+CATEGORIES: bigdata
+#+COMMENTS: no
+
+机器学习在近几年不管是在社区还是商业公司越来越火热，但是对于机器学习只有模糊的概念。究竟什么是机器学习，都有哪些使用场景，本文从一个初学者的角度来探索下机器学习。
+#+BEGIN_HTML
+<!-- more -->
+#+END_HTML
+*** 机器学习的变迁
+#+BEGIN_QUOTE
+"A computer program is said to learn from experience E with respect to some class of tasks T and performance measure P, if its performance at tasks in T, as measured by P, improves with experience E."
+#+END_QUOTE
+上述引用了大牛 Tom Mitchell 对机器学习的定义，想要了解更多 Tom Mitchell 的信息，请参考: [[http://www.cs.cmu.edu/~tom/][Tom Mitchell's Home Page]]
+
+

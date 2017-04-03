@@ -1,0 +1,32 @@
+#+TITLE: apache_beam
+#+DATE: 2017-03-02
+#+LAYOUT: post
+#+TAGS:
+#+CATEGORIES:
+
+Apache Beam 是什么?
+
+Apache Beam 实现 WordCount
+
+PipeLine
+一个Pipeline是对一个数据处理任务抽象，它包含了我们在对给定数据集处理的全部逻辑，主要包括从数据源读取数据（可能从多个数据源读取）、在给定的数据集上执行Transform操作（中间可能是一个DAG图，通过多个Transform连接，而Transform的输出和输出都可能是一个数据集）、将Transform的数据结果写入到指定对的存储系统中
+
+PipeLineOptions
+
+PCollection
+一个PCollection是对分布式数据集的抽象，他可以是输入数据集、中间结果数据集、输出数据集。每一个由PCollection表征的数据集作为输入时，都会存在一个或多个Transform作用在其上（对数据集进行处理的逻辑
+
+PTransform
+一个Transform表示数据处理过程中一个步骤（Step），对应于Pipeline中一个操作，每一个Transform会以一个或多个PCollection作为输入，经过处理后输出一个或多个PCollection
+
+Runner
+PipelineRunner是实际用来处理Pipeline逻辑的底层组件，它能够将用户构建的Pipeline翻译成底层计算引擎能够处理的Job，并执行Pipeline的处理逻辑
+
+
+ParDo => DoFn
+
+Apache Beam 支持的计算框架中功能完善程度对比
+
+* 问题
++ Apache Beam 是怎么将自有的变成模型转化为其他计算引擎可识别的语义, 并在其他引擎上运行的
+

@@ -1,0 +1,256 @@
+title: 数据收集到消费
+date: 2016-11-16
+tags:
+- data collect
+categories: Bigdata
+---
+
+#### 引言
+
+本文旨在给出一套简单的日志服务解决方案。着重介绍整个流程的打通，即各个组件的操作和配置，不介绍多个备选组件和方案的取舍。
+
+本方案中，日志收集使用 Fluentd 客户端，日志缓存使用 Kafka，下游消费可根据需求使用 Spark Streaming 或 Storm。
+
+#### 日志收集
+
+社区提供了多种日志收集客户端，因考虑到功能性和性能消耗，我们这里使用 fluentd
+
+##### Kafka 准备工作
+
+1. 获取 zookeeper 地址: zookeeper_host:2181
+
+2. 创建 Topic
+
+   Kafka 提供一系列工具进行日常操作，创建 Topic 见下：
+
+   ```shell
+   ./kafka-topics.sh --create --zookeeper zookeeper_host:2181 --topic test-topic --replication-factor 3 --partitions 10
+   # --zookeeper 即为之前获取的 zookeeper 地址
+   # --topic 为 Kafka 中创建的实例名，全局唯一，用于上下游辨识
+   # --replication-factor 为数据副本数，强烈设置为 3，当此值 < 3 时，可能会有数据丢失
+   # --partitions 指定此 topic 的分片数，作为参考单 partition 可按照 1 ~ 2MB 流量，故 partitions_num = 流量(峰值流量，单位 MB) / 2MB
+   ```
+
+##### 收集规则
+
+Fluentd 包含以下配置字段:
+
+1. source 设置数据源
+2. match 设置输出
+3. filter 设置输出前的处理逻辑
+4. system 设置系统级别配置
+5. label
+6. @include 包含其他可重用文件
+
+利用 source 和 match 即可配置一个简单的实例，本文给出一个输出到 kafka 的配置，更多信息请参考 [Fluentd Configuration](http://docs.fluentd.org/articles/config-file)
+
+假设需上传到 Kafka 的日志信息如下：
+
+```shell
+日志路径: /var/nginx/log/
+日志名：access.log* (当前正在写的文件为 access.log，历史文件格式为 access.log.2016090113)
+Kafka 集群 zookeeper 地址："10.100.0.1:2181,10.100.0.2:2181,10.100.0.3:2181" (IP 换为 hostname 需保证 DNS 可以识别 hostname，修改 /etc/hosts 添加映射也可)
+Kafka 集群对应 Topic 名称：test-topic
+```
+
+对应 Fluentd 配置如下：
+
+```xml
+<source>
+  @type tail
+  path /var/nginx/log/access.log*
+  pos_file /pos/access_log.pos
+  tag test.access_log
+  rotate_wait 180
+  read_from_head true
+  format none
+</source>
+
+<match test.access_log>
+  @type kafka_buffered
+  buffer_type memory
+  zookeeper 10.100.0.1:2181,10.100.0.2:2181,10.100.0.3:2181
+  zookeeper_path /brokers/ids
+  default_topic test-topic
+  flush_interval 5
+  output_data_type single_value
+  add_newline false
+  max_send_retries 3
+  required_acks 1
+  ack_timeout 30
+</match>
+```
+
+按照以上 Demo 配置自己的日志收集：
+
+1. 针对每个收集任务，需要 source & match 配对使用，source 负责收集数据，match 负责发送数据。即在配置文件中，每传输一个日志，需要配置不同的 source & match
+
+2. 默认指定的配置文件为 /opt/td-agent/etc/fluentd/fluent.conf，此文件为部分示例，可将示例注释掉，修改为自己的配置
+
+3. 同一个配置文件中的多个 source & match 通过 tag 字段来进行匹配，示例中 source 对应的 tag 字段为  *ksc.kmr.access_log*，与之匹配的 match 需指定 tag，示例中 match 指定 tag 的配置为 *\<match ksc.kmr.access_log>*，将其替换为自定义的 tag 即可
+
+4. source & match 中除默认字段外，配置时需替换的字段为：
+
+   ```python
+   source:
+     path /var/nginx/log/access.log*
+     pos_file /pos/access_log.pos # 此文件为进度记录文件，负责记录发送进度，保持 /opt/td-agent/pos/ 目录不变，修改文件名即可
+     tag ksc.kmr.access_log
+
+   match:
+     <match ksc.kmr.access_log>  # ksc.kmr.access.log 为 source 中定义的 tag 字段值
+     zookeeper 10.100.0.1:2181,10.100.0.2:2181,10.100.0.3:2181
+     default_topic kmr-access-topic
+   ```
+
+以上步骤即可完成一个简单日志的收集。如果有多个日志需要收集则需要在 fluentd.conf 中配置多个 source & match，这种方式管理起来比较复杂也不优雅，可按照一个日志收集对应一个配置文件，如下：
+
+```shell
+[root@test fluentd]# ls
+test1.conf  test2.conf  test3.conf  test4.conf fluent.conf
+```
+
+1. 除去 fluent.conf 外，其他的配置文件均依次对应一个日志收集配置，每个配置文件均包含一个 source 和 一个 match，对应一个日志收集。共有 4 个
+
+2. 因默认只加载 fluent.conf，故需要在 fluent.conf 指定加载其他 4 个配置文件，见下:
+
+   ```shell
+   @include /opt/td-agent/etc/fluentd/test*.conf
+   ```
+
+   在 fluent.conf 增加 @include，将其他文件加载即可，支持正则匹配
+
+使用以上配置且 Fluentd 启动正常后，access.log 新增日志会实时发送至 Kafka 对应的 Topic 中
+
+##### 客户端操作
+
+1. 启动 Fluentd
+
+   ```shell
+   cd /opt/td-agent && sh start_fluentd.sh
+   ```
+
+2. 停止 Fluentd
+
+   ```shell
+   cd /opt/td-agent && sh stop_fluentd.sh
+   ```
+
+3. 查看 Fluentd 程序日志
+
+   启动后 Fluentd 日志将会写入 /opt/td-agent/log/fluentd.log (启动时请使用 root 权限)
+
+##### 验证
+
+Fluentd 配置结束启动后，可以在 Kafka Broker 端进行数据验证，观察数据是否正常发布到 Kafka
+
+```shell
+./kafka-console-consumer.sh --zookeeper 10.100.0.1:2181 --topic test-topic --from-beginning --max-messages 10
+# --zookeeper 为当前 kafka 集群所使用 zookeeper 地址，即 "Kafka 准备工作" 中所获取到的地址
+# --topic 为需获取数据的 kafka 对应 topic name
+# --from-beginning 从 topic 最早点开始订阅，若订阅最新点数据可将此配置去掉
+# --max-messages 限制 console 打印的数据条数，避免数据量太大异常中断 console
+```
+
+更多信息请参考 [Kafka QuickStart](http://kafka.apache.org/documentation.html#quickstart_consume)
+
+#### 日志消费
+
+##### 导出到 HDFS
+
+导出 HDFS 可以使用 spark-streaming 任务或者 Flume，这里介绍 Flume 的部署方法
+
+##### Flume 简要说明
+
+Flume 提供可靠且高可用的日志采集、聚合和传输的日志系统，主体包含 Source、Channel、Sink 三个部分, 在配置文件中指定这三个部分，即可完成一个简单的日志采集和传输任务
+
+##### Flume 部署
+
+###### Flume 获取
+
+```powershell
+wget http://mirror.bit.edu.cn/apache/flume/1.6.0/apache-flume-1.6.0-bin.tar.gz
+tar zxvf apache-flume-1.6.0-bin.tar.gz
+ln -s apache-flume-1.6.0-bin flume
+```
+
+###### 环境变量
+
+Flume 单个实例启动时需启动 JVM，依赖 Java。需要设置 JAVA_HOME，目前 KMR 集群各个机器上已经默认设置，Java 版本为 1.7。如若没有设置利用 export 传递给子 shell 即可，也可使用 flume/conf/flume-env.sh 来设置即可
+
+```powershell
+# echo $JAVA_HOME
+/usr/java/oracle-jdk
+# export JAVA_HOME=/usr/java/oracle-jdk
+```
+
+###### Flume 配置
+
+Flume 完成一个传输任务，需要三个不同组件之间的配合，分别为 Source、Channel、Sink，数据流向为 Source -> Channel -> Sink
+
+> 本文档以 HDFS 作为目的地来说明配置
+
+###### 配置文件(flume-kafka-sink.properties)
+
+```powershell
+# 全局配置
+
+## Flume 每个采集任务均设置一个 agent name，这里的 agent name 为 producer
+### Source : 负责从数据源采集数据
+### Channel : 负责缓存数据
+### Sink : 负责将缓存数据传输至目的地
+
+## 设置各个组件的 nickname，用来在后面引用
+agent.sources = kafkaSource
+agent.channels = memoryChannel
+agent.sinks = hdfsSink
+
+# Kafka Source
+agent.sources.kafkaSource.type = org.apache.flume.source.kafka.KafkaSource
+agent.sources.kafkaSource.channels = memoryChannel
+agent.sources.kafkaSource.zookeeperConnect = zookeeper:2181
+agent.sources.kafkaSource.topic = test-topic
+agent.sources.kafkaSource.groupId = flume
+agent.sources.kafkaSource.kafka.consumer.timeout.ms = 10000
+agent.sources.kafkaSource.kafka.auto.commit.enable = true
+
+# Interceptors
+agent.sources.kafkaSource.interceptors = i1 i2
+
+agent.sources.kafkaSource.interceptors.i1.type = regex_extractor
+agent.sources.kafkaSource.interceptors.i1.regex = "hostname":"(\\w.*?)","time":(\\d.*?),"tag":"(\\w.*?)"
+agent.sources.kafkaSource.interceptors.i1.serializers = s1 s2 s3
+agent.sources.kafkaSource.interceptors.i1.serializers.s1.name = hostname
+agent.sources.kafkaSource.interceptors.i1.serializers.s2.name = timestamp_test
+agent.sources.kafkaSource.interceptors.i1.serializers.s3.name = log_name
+
+# Extractor content timestamp
+agent.sources.kafkaSource.interceptors.i2.type = regex_extractor
+agent.sources.kafkaSource.interceptors.i2.regex = (\d\d\d\d/\d\d/\d\d\s\d\d:\d\d)
+agent.sources.kafkaSource.interceptors.i2.serializers = t
+agent.sources.kafkaSource.interceptors.i2.serializers.t.type = org.apache.flume.interceptor.RegexExtractorInterceptorMillisSerializer
+agent.sources.kafkaSource.interceptors.i2.serializers.t.name = timestamp
+agent.sources.kafkaSource.interceptors.i2.serializers.t.pattern = yyyy/MM/dd HH:mm
+
+# Channel
+agent.channels.memoryChannel.type = memory
+agent.channels.memoryChannel.capacity = 10000
+agent.channels.memoryChannel.transactionCapacity = 1000
+
+# Debug Sink
+agent.sinks.hdfsSink.type = logger
+agent.sinks.hdfsSink.channel = memoryChannel
+agent.sinks.hdfsSink.maxBytes = 100
+
+# HDFS Sink
+agent.sinks.hdfsSink.type = hdfs
+agent.sinks.hdfsSink.hdfs.path = hdfs:///log/%Y%m%d/%{log_name}/%H
+agent.sinks.hdfsSink.hdfs.filePrefix = %{hostname}
+agent.sinks.hdfsSink.hdfs.rollInterval = 3600
+agent.sinks.hdfsSink.hdfs.rollSize = 0
+agent.sinks.hdfsSink.hdfs.rollCount = 0
+agent.sinks.hdfsSink.hdfs.fileType = DataStream
+agent.sinks.hdfsSink.hdfs.useLocalTimeStamp = false
+agent.sinks.hdfsSink.channel = memoryChannel
+```
+

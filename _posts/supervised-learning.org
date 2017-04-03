@@ -1,0 +1,5 @@
+#+TITLE: 机器学习之监督学习
+#+DATE: 2017-01-04
+#+LAYOUT: post
+#+TAGS: supervised-learning, algorithm
+#+CATEGORIES: bigdata

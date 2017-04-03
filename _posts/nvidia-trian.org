@@ -1,0 +1,20 @@
+#+TITLE: Nvidia 培训
+#+DATE: 2017-03-24
+#+LAYOUT: post
+#+TAGS:
+#+CATEGORIES:
+
+**** CPU vs GPU
+
+1. CPU & GPU 寄存器和计算单元的配置比例的差异
+2. CPU 适合串行 & 计算逻辑复杂的，寄存器缓存较大适合逻辑判断跳转
+3. GPU 适合计算量大，逻辑简单
+4. GPU 为不同的计算用途设置了不同的计算核心, 针对不同的数据结构提供了不同的缓存区(TEXT, Content Cache)
+
+
+**** 问题
+
+1. 非 GPU 程序，如何判断哪些处理逻辑跑在 GPU 上
+2. GPU 程序在不指定 device 的话，如何分配在哪个 GPU 上运行
+如果不指定 device，CUDA 架构中默认是 device 0
+3. 一个 CUDA kernel (CUDA 函数)对应一个 Grid

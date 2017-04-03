@@ -1,0 +1,69 @@
+title: Flume 部署
+date: 2016-10-12
+tags: Flume
+categories: Bigdata
+---
+## Flume 简要说明
+Flume 提供可靠且高可用的日志采集、聚合和传输的日志系统，主体包含 Source、Channel、Sink 三个部分, 在配置文件中指定这三个部分，即可完成一个简单的日志采集和传输任务
+
+## Flume 部署
+### Flume 获取
+``` powershell
+wget http://mirror.bit.edu.cn/apache/flume/1.6.0/apache-flume-1.6.0-bin.tar.gz
+tar zxvf apache-flume-1.6.0-bin.tar.gz
+ln -s apache-flume-1.6.0-bin flume
+```
+### 环境变量
+Flume 单个实例启动时需启动 JVM，依赖 Java。需要设置 JAVA_HOME，目前 KMR 集群各个机器上已经默认设置，Java 版本为 1.7。如若没有设置利用 export 传递给子 shell 即可，也可使用 flume/conf/flume-env.sh 来设置即可
+``` powershell
+# echo $JAVA_HOME
+/usr/java/oracle-jdk
+# export JAVA_HOME=/usr/java/oracle-jdk
+```
+### Flume 配置
+Flume 完成一个传输任务，需要三个不同组件之间的配合，分别为 Source、Channel、Sink，数据流向为 Source -> Channel -> Sink
+> 本文档以 Kafka 作为目的地来说明配置
+
+#### 配置文件(flume-kafka-sink.properties)
+``` powershell
+# 全局配置
+
+## Flume 每个采集任务均设置一个 agent name，这里的 agent name 为 producer
+### Source : 负责从数据源采集数据
+### Channel : 负责缓存数据
+### Sink : 负责将缓存数据传输至目的地
+
+## 设置各个组件的 nickname，用来在后面引用
+producer.sources = s
+producer.channels = c
+producer.sinks = r
+
+# Source
+producer.sources.s.type = spooldir
+producer.sources.s.spoolDir = /mnt/test/data/
+producer.sources.s.channels = c
+producer.sources.s.batchSize = 1000
+#在flume agent的数据源中按实际处理的文件内容配置信息长度
+producer.sources.s.deserializer.maxLineLength = 10240
+producer.sources.s.interceptors = i
+producer.sources.s.interceptors.i.type = org.apache.flume.sink.solr.morphline.UUIDInterceptor$Builder
+producer.sources.s.interceptors.i.headerName = key
+producer.sources.s.interceptors.i.preserveExisting = false
+
+# Channel
+producer.channels.c.type = memory
+producer.channels.c.capacity = 10000
+producer.channels.c.transactionCapacity = 1000
+
+# Sink
+producer.sinks.r.type = org.apache.flume.sink.kafka.KafkaSink
+producer.sinks.r.brokerList = 
+producer.sinks.r.request.required.acks=-1
+producer.sinks.r.max.message.size=1000000
+producer.sinks.r.producer.type=sync
+producer.sinks.r.custom.encoding=UTF-8
+producer.sinks.r.topic=0810
+producer.sinks.r.channel = c
+producer.sinks.r.batchSize = 1000
+```
+
